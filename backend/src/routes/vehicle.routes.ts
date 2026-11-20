@@ -10,7 +10,105 @@ const validStatuses = new Set([
   "offline",
   "fault",
 ]);
+router.get("/:id/history", (req, res) => {
+  const vehicleId = req.params.id;
 
+  // Find the requested vehicle
+  const vehicle = vehicles.find(
+    (item) => item.vehicle_id === vehicleId
+  );
+
+  if (!vehicle) {
+    return res.status(404).json({
+      success: false,
+      message: "Vehicle not found",
+    });
+  }
+
+  // Read query parameters
+  const points =
+    typeof req.query.points === "string"
+      ? Number(req.query.points)
+      : 24;
+
+  const from =
+    typeof req.query.from === "string"
+      ? new Date(req.query.from)
+      : new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const to =
+    typeof req.query.to === "string"
+      ? new Date(req.query.to)
+      : new Date();
+
+  // Validate input
+  if (
+    !Number.isInteger(points) ||
+    points < 2 ||
+    points > 200 ||
+    Number.isNaN(from.getTime()) ||
+    Number.isNaN(to.getTime()) ||
+    from >= to
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid history parameters",
+    });
+  }
+
+  // Calculate time interval between readings
+  const interval =
+    (to.getTime() - from.getTime()) / (points - 1);
+
+  // Generate mock historical readings
+  const history = Array.from(
+    { length: points },
+    (_, index) => {
+      const timestamp = new Date(
+        from.getTime() + interval * index
+      );
+
+      const progress = index / (points - 1);
+
+      const socVariation = Math.random() * 10;
+
+      return {
+        timestamp: timestamp.toISOString(),
+
+        soc_pct: Number(
+          Math.min(
+            100,
+            Math.max(
+              0,
+              vehicle.soc_pct - (1 - progress) * socVariation
+            )
+          ).toFixed(1)
+        ),
+
+        battery_temp_c: Number(
+          (
+            vehicle.battery_temp_c +
+            (Math.random() * 4 - 2)
+          ).toFixed(1)
+        ),
+
+        speed_kmh:
+          vehicle.status === "moving"
+            ? Number((Math.random() * 40 + 10).toFixed(1))
+            : 0,
+
+        // Simulate occasional missing telemetry
+        gap: Math.random() < 0.05,
+      };
+    }
+  );
+
+  return res.status(200).json({
+    success: true,
+    vehicle_id: vehicle.vehicle_id,
+    history,
+  });
+});
 router.get("/", (req, res) => {
   // Read query parameters
   const q =
