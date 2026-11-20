@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import vehicleRoutes from "./routes/vehicle.routes.js";
 import fleetRoutes from "./routes/fleet.routes.js";
+import alertRoutes from "./routes/alert.routes.js";
+
 const app = express();
 
 // Allow requests from our frontend
@@ -19,5 +21,6 @@ app.get("/health", (req, res) => {
 
 app.use("/v1/vehicles", vehicleRoutes);
 app.use("/v1/fleet", fleetRoutes);
+app.use("/v1/alerts", alertRoutes);
 
 export default app;
