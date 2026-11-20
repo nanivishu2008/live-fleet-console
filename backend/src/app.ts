@@ -3,6 +3,7 @@ import cors from "cors";
 import vehicleRoutes from "./routes/vehicle.routes.js";
 import fleetRoutes from "./routes/fleet.routes.js";
 import alertRoutes from "./routes/alert.routes.js";
+import streamRoutes from "./routes/stream.routes.js";
 
 const app = express();
 
@@ -22,5 +23,6 @@ app.get("/health", (req, res) => {
 app.use("/v1/vehicles", vehicleRoutes);
 app.use("/v1/fleet", fleetRoutes);
 app.use("/v1/alerts", alertRoutes);
+app.use("/v1/stream", streamRoutes);
 
 export default app;
