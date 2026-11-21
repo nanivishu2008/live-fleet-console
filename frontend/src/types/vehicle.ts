@@ -22,3 +22,10 @@ export interface VehicleListResponse {
   items: Vehicle[];
   next_cursor: string | null;
 }
+
+export interface VehicleFilters {
+  q: string;
+  status: VehicleStatus | "all";
+  soc_min: string;
+  soc_max: string;
+}
