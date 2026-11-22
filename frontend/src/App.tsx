@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-
+import FleetMap from "./components/fleet/FleetMap";
 import { useFleetStore } from "./store/fleet.store";
 
 import type { VehicleFilters, VehicleStatus } from "./types/vehicle";
@@ -9,6 +9,8 @@ import FleetSummaryCards from "./components/fleet/FleetSummaryCards";
 import VehicleFiltersComponent from "./components/fleet/VehicleFilters";
 import VehicleSearch from "./components/fleet/VehicleSearch";
 import VehicleList from "./components/fleet/VehicleList";
+import VehicleHistoryPanel from "./components/charts/VehicleHistoryPanel";
+import AlertsPanel from "./components/alerts/AlertsPanel";
 
 const validStatuses: VehicleStatus[] = [
   "moving",
@@ -94,6 +96,11 @@ function App() {
         <DashboardHeader />
 
         <FleetSummaryCards />
+
+        <FleetMap />
+
+        <VehicleHistoryPanel />
+        <AlertsPanel />
 
         <section className="space-y-4">
           <div>

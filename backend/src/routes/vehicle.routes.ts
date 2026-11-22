@@ -2,7 +2,21 @@ import { Router } from "express";
 import { vehicles } from "../data/vehicles.js";
 
 const router = Router();
+// Get locations of all vehicles for the fleet map
+router.get("/locations", (_req, res) => {
+  const locations = vehicles.map((vehicle) => ({
+    vehicle_id: vehicle.vehicle_id,
+    status: vehicle.status,
+    lat: vehicle.lat,
+    lng: vehicle.lng,
+  }));
 
+  return res.status(200).json({
+    success: true,
+    total: locations.length,
+    items: locations,
+  });
+});
 const validStatuses = new Set([
   "moving",
   "idle",
