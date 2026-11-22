@@ -29,8 +29,8 @@ const API_URL = import.meta.env.VITE_API_URL;
 const statusColors: Record<VehicleStatus, string> = {
   moving: "#22c55e",
   idle: "#eab308",
-  charging: "#3b82f6",
-  offline: "#64748b",
+  charging: "#f97316",
+  offline: "#78716c",
   fault: "#ef4444",
 };
 
@@ -348,15 +348,15 @@ function FleetMap() {
   }, [vehicles]);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+    <section className="overflow-hidden rounded-xl border border-stone-800/90 bg-stone-900/80 shadow-xl backdrop-blur-sm">
       {/* Map heading */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/90 p-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-bold text-white">
             Fleet Location Map
           </h2>
 
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm italic text-stone-400">
             {loading
               ? "Loading vehicles..."
               : error
@@ -370,14 +370,14 @@ function FleetMap() {
           <span
             className={`h-2.5 w-2.5 rounded-full ${
               connectionStatus === "connected"
-                ? "bg-green-500"
+                ? "bg-green-500 shadow-sm shadow-green-500/50"
                 : connectionStatus === "connecting"
-                  ? "bg-yellow-500"
-                  : "bg-red-500"
+                  ? "bg-orange-500 shadow-sm shadow-orange-500/50"
+                  : "bg-red-500 shadow-sm shadow-red-500/50"
             }`}
           />
 
-          <span className="text-sm text-slate-300">
+          <span className="text-sm italic text-stone-300">
             {connectionStatus === "connected"
               ? "Live"
               : connectionStatus === "connecting"
@@ -390,11 +390,11 @@ function FleetMap() {
       {/* Map */}
       <div className="h-[500px] w-full">
         {error ? (
-          <div className="p-4 text-sm text-red-400">
+          <div className="p-4 text-sm italic text-red-400">
             Failed to load map: {error}
           </div>
         ) : loading ? (
-          <div className="p-4 text-sm text-slate-400">
+          <div className="p-4 text-sm italic text-stone-400">
             Loading vehicle locations...
           </div>
         ) : (
@@ -439,7 +439,7 @@ function FleetMap() {
       </div>
 
       {/* Status legend */}
-      <div className="flex flex-wrap gap-5 border-t border-slate-800 p-4">
+      <div className="flex flex-wrap gap-5 border-t border-stone-800/90 p-4">
         {Object.entries(statusColors).map(
           ([status, color]) => (
             <div
@@ -451,7 +451,7 @@ function FleetMap() {
                 style={{ backgroundColor: color }}
               />
 
-              <span className="text-sm capitalize text-slate-300">
+              <span className="text-sm capitalize italic text-stone-300">
                 {status}
               </span>
             </div>

@@ -91,8 +91,11 @@ function App() {
   }, [filters, initialized]);
 
   return (
-    <main className="min-h-screen bg-slate-950 p-6 text-white">
+    <main className="min-h-screen bg-[#0c0a09] bg-[radial-gradient(ellipse_80%_80%_at_50%_-10%,rgba(249,115,22,0.22),rgba(12,10,9,0))] p-4 sm:p-6 text-white selection:bg-orange-500 selection:text-white">
       <div className="mx-auto max-w-7xl space-y-6">
+        {/* Top vibrant orange decorative accent bar */}
+        <div className="h-1 w-full rounded-full bg-gradient-to-r from-orange-600 via-amber-400 to-orange-500 shadow-sm shadow-orange-500/50" />
+
         <DashboardHeader />
 
         <FleetSummaryCards />
@@ -104,12 +107,12 @@ function App() {
 
         <section className="space-y-4">
           <div>
-            <h2 className="text-xl font-semibold text-white">
+            <h2 className="text-xl font-bold text-white">
               Vehicle Explorer
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
-              Search and monitor your fleet vehicles.
+            <p className="mt-1 text-sm italic text-stone-400">
+              Search and monitor your fleet vehicles with real-time telemetry.
             </p>
           </div>
 

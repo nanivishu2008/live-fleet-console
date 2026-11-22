@@ -27,7 +27,7 @@ function VehicleFilters() {
       <select
         value={filters.status}
         onChange={(event) => handleStatusChange(event.target.value)}
-        className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-white outline-none focus:border-blue-500"
+        className="rounded-lg border border-stone-700 bg-stone-900/90 px-4 py-2.5 text-sm italic text-stone-200 outline-none transition-all focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
       >
         <option value="all">All statuses</option>
         <option value="moving">Moving</option>
@@ -46,7 +46,7 @@ function VehicleFilters() {
         onChange={(event) =>
           handleBatteryChange("soc_min", event.target.value)
         }
-        className="w-36 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-white outline-none focus:border-blue-500"
+        className="w-36 rounded-lg border border-stone-700 bg-stone-900/90 px-4 py-2.5 text-sm text-stone-200 placeholder:italic placeholder:text-stone-500 outline-none transition-all focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
       />
 
       <input
@@ -58,7 +58,7 @@ function VehicleFilters() {
         onChange={(event) =>
           handleBatteryChange("soc_max", event.target.value)
         }
-        className="w-36 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-white outline-none focus:border-blue-500"
+        className="w-36 rounded-lg border border-stone-700 bg-stone-900/90 px-4 py-2.5 text-sm text-stone-200 placeholder:italic placeholder:text-stone-500 outline-none transition-all focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
       />
     </div>
   );

@@ -5,7 +5,7 @@ function FleetSummaryCards() {
 
   if (!summary) {
     return (
-      <p className="text-sm text-slate-400">
+      <p className="text-sm italic text-orange-300/70">
         Loading fleet statistics...
       </p>
     );
@@ -49,13 +49,13 @@ function FleetSummaryCards() {
       {cards.map((card) => (
         <div
           key={card.label}
-          className="rounded-xl border border-slate-800 bg-slate-900 p-4"
+          className="group rounded-xl border border-stone-800/90 bg-stone-900/80 p-4 shadow-lg shadow-black/30 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-orange-500/10"
         >
-          <p className="text-sm text-slate-400">
+          <p className="text-xs font-semibold uppercase italic tracking-wider text-orange-400/90 transition-colors group-hover:text-orange-300">
             {card.label}
           </p>
 
-          <p className="mt-3 text-2xl font-semibold text-white">
+          <p className="mt-2 text-2xl font-bold tracking-tight text-white transition-colors group-hover:text-orange-100">
             {card.value}
           </p>
         </div>

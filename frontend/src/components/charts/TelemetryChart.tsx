@@ -91,12 +91,12 @@ function TelemetryChart({
   // Display a message when no history is available.
   if (points.length === 0) {
     return (
-      <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-        <h3 className="text-lg font-semibold text-white">
+      <section className="rounded-xl border border-stone-800 bg-stone-950/80 p-5 shadow-lg">
+        <h3 className="text-lg font-bold text-white">
           {title}
         </h3>
 
-        <p className="mt-6 text-sm text-slate-400">
+        <p className="mt-6 text-sm italic text-stone-400">
           No telemetry data available.
         </p>
       </section>
@@ -104,10 +104,15 @@ function TelemetryChart({
   }
 
   return (
-    <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-      <h3 className="mb-4 text-lg font-semibold text-white">
-        {title}
-      </h3>
+    <section className="rounded-xl border border-stone-800 bg-stone-950/80 p-5 shadow-lg">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-bold text-white">
+          {title}
+        </h3>
+        <span className="text-xs font-medium italic text-orange-400/90">
+          {unit}
+        </span>
+      </div>
 
       <div className="w-full overflow-x-auto">
         <svg
@@ -128,7 +133,7 @@ function TelemetryChart({
                   y1={y}
                   x2={WIDTH - PADDING.right}
                   y2={y}
-                  stroke="#334155"
+                  stroke="#292524"
                   strokeDasharray="4 4"
                 />
 
@@ -136,8 +141,9 @@ function TelemetryChart({
                   x={PADDING.left - 10}
                   y={y + 4}
                   textAnchor="end"
-                  fill="#94a3b8"
+                  fill="#78716c"
                   fontSize="11"
+                  fontStyle="italic"
                 >
                   {value.toFixed(0)}
                 </text>
@@ -151,7 +157,7 @@ function TelemetryChart({
             y1={HEIGHT - PADDING.bottom}
             x2={WIDTH - PADDING.right}
             y2={HEIGHT - PADDING.bottom}
-            stroke="#64748b"
+            stroke="#57534e"
           />
 
           {/* Y-axis */}
@@ -160,7 +166,7 @@ function TelemetryChart({
             y1={PADDING.top}
             x2={PADDING.left}
             y2={HEIGHT - PADDING.bottom}
-            stroke="#64748b"
+            stroke="#57534e"
           />
 
           {/* Telemetry lines */}
@@ -169,7 +175,7 @@ function TelemetryChart({
               key={index}
               points={segment.join(" ")}
               fill="none"
-              stroke="#38bdf8"
+              stroke="#f97316"
               strokeWidth="2.5"
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -194,8 +200,10 @@ function TelemetryChart({
                 key={`${point.timestamp}-${index}`}
                 cx={getX(index)}
                 cy={getY(value)}
-                r="3"
-                fill="#38bdf8"
+                r="3.5"
+                fill="#fb923c"
+                stroke="#7c2d12"
+                strokeWidth="1"
               />
             );
           })}
@@ -205,8 +213,9 @@ function TelemetryChart({
             <text
               x={PADDING.left}
               y={HEIGHT - 12}
-              fill="#94a3b8"
+              fill="#a8a29e"
               fontSize="11"
+              fontStyle="italic"
             >
               {new Date(
                 points[0].timestamp
@@ -220,8 +229,9 @@ function TelemetryChart({
               x={WIDTH - PADDING.right}
               y={HEIGHT - 12}
               textAnchor="end"
-              fill="#94a3b8"
+              fill="#a8a29e"
               fontSize="11"
+              fontStyle="italic"
             >
               {new Date(
                 points[points.length - 1].timestamp
@@ -233,8 +243,10 @@ function TelemetryChart({
           <text
             x={PADDING.left}
             y={12}
-            fill="#94a3b8"
+            fill="#ea580c"
             fontSize="11"
+            fontStyle="italic"
+            fontWeight="600"
           >
             {unit}
           </text>

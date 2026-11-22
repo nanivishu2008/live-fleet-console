@@ -28,7 +28,7 @@ function VehicleSearch() {
         placeholder="Search vehicle ID..."
         value={search}
         onChange={(event) => setSearch(event.target.value)}
-        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-white outline-none focus:border-blue-500"
+        className="w-full rounded-lg border border-stone-700 bg-stone-900/90 px-4 py-2.5 text-sm text-white placeholder:italic placeholder:text-stone-500 outline-none transition-all focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
       />
 
       <button
@@ -38,7 +38,7 @@ function VehicleSearch() {
             q: search.trim(),
           })
         }
-        className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-500"
+        className="cursor-pointer rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-orange-500/25 transition-all duration-200 hover:from-orange-600 hover:to-amber-600 hover:shadow-orange-500/40 active:scale-95"
       >
         Search
       </button>

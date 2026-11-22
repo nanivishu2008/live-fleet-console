@@ -50,16 +50,16 @@ function VehicleHistoryPanel() {
   }
 
   return (
-    <section className="space-y-5 rounded-xl border border-slate-800 bg-slate-950 p-5">
+    <section className="space-y-5 rounded-xl border border-stone-800/90 bg-stone-900/80 p-5 shadow-xl backdrop-blur-sm">
 
       {/* Panel heading */}
       <div>
-        <h2 className="text-xl font-semibold text-white">
+        <h2 className="text-xl font-bold text-white">
           Vehicle Telemetry History
         </h2>
 
-        <p className="mt-1 text-sm text-slate-400">
-          Analyse historical battery and vehicle performance.
+        <p className="mt-1 text-sm italic text-stone-400">
+          Analyse historical battery and vehicle performance dynamics.
         </p>
       </div>
 
@@ -77,14 +77,14 @@ function VehicleHistoryPanel() {
           }}
           placeholder="Enter vehicle ID"
           aria-label="Vehicle ID"
-          className="min-w-[220px] rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white outline-none focus:border-sky-500"
+          className="min-w-[220px] rounded-lg border border-stone-700 bg-stone-950/90 px-4 py-2.5 text-white placeholder:italic placeholder:text-stone-500 outline-none transition-all focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
         />
 
         <button
           type="button"
           onClick={handleSearch}
           disabled={loading}
-          className="rounded-lg bg-sky-600 px-5 py-2 font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-orange-500/25 transition-all duration-200 hover:from-orange-600 hover:to-amber-600 hover:shadow-orange-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Loading..." : "Load History"}
         </button>
@@ -95,7 +95,7 @@ function VehicleHistoryPanel() {
       {error && (
         <div
           role="alert"
-          className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-400"
+          className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm italic text-red-400"
         >
           {error}
         </div>
@@ -104,9 +104,9 @@ function VehicleHistoryPanel() {
       {/* Charts */}
       {history.length > 0 && !loading && (
         <>
-          <div className="text-sm text-slate-400">
+          <div className="text-sm italic text-stone-400">
             Showing {history.length} historical readings for{" "}
-            <span className="font-semibold text-white">
+            <span className="font-semibold not-italic text-orange-400">
               {loadedVehicleId}
             </span>
           </div>
