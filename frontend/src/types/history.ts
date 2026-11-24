@@ -1,9 +1,10 @@
 export interface TelemetryPoint {
-  timestamp: string;
+  ts: string;
+  timestamp?: string;
   soc_pct: number;
   battery_temp_c: number;
   speed_kmh: number;
-  gap: boolean;
+  gap?: boolean;
 }
 
 export interface VehicleHistoryResponse {
