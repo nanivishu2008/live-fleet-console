@@ -1,1 +1,30 @@
 @import "tailwindcss";
+
+@media (prefers-contrast: more) {
+  :root {
+    --contrast-border: #ffffff;
+  }
+
+  body {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  div, section, article, table, header {
+    border-color: #ffffff !important;
+  }
+
+  button {
+    border: 2px solid #ffffff !important;
+    font-weight: 800 !important;
+  }
+
+  p, span, td, th {
+    color: #ffffff !important;
+  }
+
+  .text-orange-400, .text-amber-300, .text-orange-300 {
+    color: #ff9900 !important;
+    font-weight: 800 !important;
+  }
+}

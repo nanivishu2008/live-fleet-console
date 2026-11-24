@@ -1,465 +1,252 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-
-import type {
-  MapVehicle,
-  VehicleUpdateEvent,
-} from "../../types/map";
-
-import { fetchMapVehicles } from "../../services/map.api";
-
+import { useEffect, useMemo } from "react";
 import {
   MapContainer,
   Marker,
   Popup,
   TileLayer,
+  useMap,
 } from "react-leaflet";
-
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 
+import { useFleetStore } from "../../store/fleet.store";
+import { useSelectionStore } from "../../store/selection.store";
 import type { VehicleStatus } from "../../types/vehicle";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-const statusColors: Record<VehicleStatus, string> = {
-  moving: "#22c55e",
-  idle: "#eab308",
-  charging: "#f97316",
-  offline: "#78716c",
-  fault: "#ef4444",
+const statusConfig: Record<VehicleStatus, { color: string; symbol: string; label: string; shapeClass: string }> = {
+  moving: {
+    color: "#22c55e",
+    symbol: "▲",
+    label: "Moving",
+    shapeClass: "rounded-full",
+  },
+  idle: {
+    color: "#eab308",
+    symbol: "■",
+    label: "Idle",
+    shapeClass: "rounded-sm",
+  },
+  charging: {
+    color: "#f97316",
+    symbol: "⚡",
+    label: "Charging",
+    shapeClass: "rounded-full",
+  },
+  fault: {
+    color: "#ef4444",
+    symbol: "!",
+    label: "Fault",
+    shapeClass: "rotate-45 rounded-sm",
+  },
+  offline: {
+    color: "#78716c",
+    symbol: "–",
+    label: "Offline",
+    shapeClass: "rounded-md",
+  },
 };
 
-type ConnectionStatus =
-  | "connecting"
-  | "connected"
-  | "reconnecting";
+function createVehicleIcon(status: VehicleStatus, isSelected: boolean) {
+  const conf = statusConfig[status] || statusConfig.offline;
+  const size = isSelected ? 24 : 16;
+  const border = isSelected ? "3px solid #ffffff" : "1.5px solid #ffffff";
+  const shadow = isSelected
+    ? "0 0 12px rgba(249, 115, 22, 0.9), 0 0 4px rgba(0,0,0,0.8)"
+    : "0 1px 3px rgba(0,0,0,0.6)";
 
-function createVehicleIcon(status: VehicleStatus) {
   return L.divIcon({
-    className: "",
+    className: "custom-fleet-marker",
     html: `
       <div style="
-        width: 14px;
-        height: 14px;
-        background-color: ${statusColors[status]};
-        border: 2px solid white;
-        border-radius: 50%;
-        box-shadow: 0 0 5px rgba(0,0,0,0.5);
-      "></div>
+        width: ${size}px;
+        height: ${size}px;
+        background-color: ${conf.color};
+        border: ${border};
+        box-shadow: ${shadow};
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: ${isSelected ? "11px" : "8px"};
+        font-weight: bold;
+        line-height: 1;
+        transition: transform 0.2s ease;
+        transform: ${isSelected ? "scale(1.25)" : "scale(1)"};
+      " class="${conf.shapeClass}">
+        <span style="display:inline-block; transform: ${status === "fault" ? "rotate(-45deg)" : "none"}">
+          ${conf.symbol}
+        </span>
+      </div>
     `,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
-function FleetMap() {
-  const [vehicles, setVehicles] = useState<MapVehicle[]>([]);
+// Controller component to pan the map when a vehicle is selected
+function MapPanController({ selectedLat, selectedLng }: { selectedLat?: number; selectedLng?: number }) {
+  const map = useMap();
 
-  const [loading, setLoading] = useState(true);
-
-  const [error, setError] = useState<string | null>(null);
-
-  const [connectionStatus, setConnectionStatus] =
-    useState<ConnectionStatus>("connecting");
-
-  // Store all vehicles using vehicle_id as the key.
-  const vehiclesMapRef = useRef<Map<string, MapVehicle>>(
-    new Map()
-  );
-
-  // Store incoming events until the next batch update.
-  const pendingUpdatesRef = useRef<
-    Map<string, VehicleUpdateEvent>
-  >(new Map());
-
-  // Remember the latest applied timestamp for each vehicle.
-  const latestUpdatedAtRef = useRef<Map<string, number>>(
-    new Map()
-  );
-
-  // Store event IDs that have already been processed.
-  const processedEventIdsRef = useRef<Set<string>>(
-    new Set()
-  );
-
-  // Fetch initial vehicle locations and establish SSE connection.
   useEffect(() => {
-    let eventSource: EventSource | null = null;
-
-    let batchTimer: ReturnType<typeof setInterval> | null = null;
-
-    let cancelled = false;
-
-    async function initializeMap() {
-      try {
-        setLoading(true);
-
-        const response = await fetchMapVehicles();
-
-        if (cancelled) return;
-
-        const initialVehicles = new Map(
-          response.items.map((vehicle) => [
-            vehicle.vehicle_id,
-            vehicle,
-          ])
-        );
-
-        vehiclesMapRef.current = initialVehicles;
-
-        setVehicles(Array.from(initialVehicles.values()));
-
-        // Initialise timestamps for vehicles already loaded.
-        latestUpdatedAtRef.current.clear();
-
-        // Clear previous event tracking.
-        pendingUpdatesRef.current.clear();
-        processedEventIdsRef.current.clear();
-
-        setError(null);
-
-        // Connect to the backend SSE stream.
-        eventSource = new EventSource(
-          `${API_URL}/v1/stream`
-        );
-
-        setConnectionStatus("connecting");
-
-        eventSource.onopen = () => {
-          setConnectionStatus("connected");
-        };
-
-        eventSource.onerror = () => {
-          setConnectionStatus("reconnecting");
-        };
-
-        // Listen for vehicle.updated events.
-        eventSource.addEventListener(
-          "vehicle.updated",
-          (event: Event) => {
-            try {
-              const message = event as MessageEvent<string>;
-
-              // Parse the received event data.
-              const update = JSON.parse(
-                message.data
-              ) as VehicleUpdateEvent;
-
-              // Validate the important fields.
-              if (
-                !update.vehicle_id ||
-                !Number.isFinite(update.lat) ||
-                !Number.isFinite(update.lng) ||
-                !update.updated_at
-              ) {
-                return;
-              }
-
-              // Validate coordinate ranges.
-              if (
-                update.lat < -90 ||
-                update.lat > 90 ||
-                update.lng < -180 ||
-                update.lng > 180
-              ) {
-                return;
-              }
-
-              // Check for duplicate event IDs.
-              const eventId = message.lastEventId;
-
-              if (eventId) {
-                if (
-                  processedEventIdsRef.current.has(eventId)
-                ) {
-                  return;
-                }
-
-                processedEventIdsRef.current.add(eventId);
-
-                // Prevent the set from growing indefinitely.
-                if (
-                  processedEventIdsRef.current.size > 5000
-                ) {
-                  const firstId =
-                    processedEventIdsRef.current.values().next().value;
-
-                  if (firstId !== undefined) {
-                    processedEventIdsRef.current.delete(firstId);
-                  }
-                }
-              }
-
-              // Check whether this update is newer.
-              const incomingTime = new Date(
-                update.updated_at
-              ).getTime();
-
-              if (!Number.isFinite(incomingTime)) {
-                return;
-              }
-
-              const previousTime =
-                latestUpdatedAtRef.current.get(
-                  update.vehicle_id
-                ) ?? 0;
-
-              const pendingUpdate =
-                pendingUpdatesRef.current.get(
-                  update.vehicle_id
-                );
-
-              const pendingTime = pendingUpdate
-                ? new Date(
-                    pendingUpdate.updated_at
-                  ).getTime()
-                : 0;
-
-              // Ignore stale or duplicate updates.
-              if (
-                incomingTime <= previousTime ||
-                incomingTime <= pendingTime
-              ) {
-                return;
-              }
-
-              // Keep only the latest update for this vehicle.
-              pendingUpdatesRef.current.set(
-                update.vehicle_id,
-                update
-              );
-            } catch (err) {
-              console.error(
-                "Failed to process vehicle event:",
-                err
-              );
-            }
-          }
-        );
-
-        // Apply incoming events in batches every 250 ms.
-        batchTimer = setInterval(() => {
-          const pendingUpdates =
-            pendingUpdatesRef.current;
-
-          if (pendingUpdates.size === 0) {
-            return;
-          }
-
-          const updatedVehicles = new Map(
-            vehiclesMapRef.current
-          );
-
-          for (const [vehicleId, update] of pendingUpdates) {
-            const updatedAt = new Date(
-              update.updated_at
-            ).getTime();
-
-            const previousTime =
-              latestUpdatedAtRef.current.get(vehicleId) ?? 0;
-
-            if (updatedAt <= previousTime) {
-              continue;
-            }
-
-            const existingVehicle =
-              updatedVehicles.get(vehicleId);
-
-            // Ignore events for unknown vehicles.
-            if (!existingVehicle) {
-              continue;
-            }
-
-            // Update the vehicle's latest data.
-            updatedVehicles.set(vehicleId, {
-              ...existingVehicle,
-              vehicle_id: update.vehicle_id,
-              status: update.status,
-              lat: update.lat,
-              lng: update.lng,
-            });
-
-            // Store the timestamp of the applied update.
-            latestUpdatedAtRef.current.set(
-              vehicleId,
-              updatedAt
-            );
-          }
-
-          // Clear processed pending updates.
-          pendingUpdates.clear();
-
-          // Update the vehicle reference.
-          vehiclesMapRef.current = updatedVehicles;
-
-          // Trigger React re-render.
-          setVehicles(
-            Array.from(updatedVehicles.values())
-          );
-        }, 250);
-      } catch (err) {
-        if (cancelled) return;
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load map vehicles"
-        );
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+    if (selectedLat !== undefined && selectedLng !== undefined) {
+      map.setView([selectedLat, selectedLng], Math.max(map.getZoom(), 13), {
+        animate: true,
+      });
     }
+  }, [selectedLat, selectedLng, map]);
 
-    initializeMap();
+  return null;
+}
 
-    // Clean up connections and timers.
-    return () => {
-      cancelled = true;
+export default function FleetMap() {
+  const allVehiclesMap = useFleetStore((state) => state.allVehicles);
+  const connectionStatus = useFleetStore((state) => state.connectionStatus);
+  const loading = useFleetStore((state) => state.loading);
+  const selectedVehicleId = useSelectionStore((state) => state.selectedVehicleId);
+  const selectVehicle = useSelectionStore((state) => state.selectVehicle);
 
-      eventSource?.close();
+  const vehicleList = useMemo(() => {
+    return Array.from(allVehiclesMap.values());
+  }, [allVehiclesMap]);
 
-      if (batchTimer) {
-        clearInterval(batchTimer);
-      }
-
-      pendingUpdatesRef.current.clear();
-      processedEventIdsRef.current.clear();
-    };
-  }, []);
-
-  // Remove vehicles with invalid coordinates.
-  const vehicleMarkers = useMemo(() => {
-    return vehicles.filter(
-      (vehicle) =>
-        Number.isFinite(vehicle.lat) &&
-        Number.isFinite(vehicle.lng) &&
-        vehicle.lat >= -90 &&
-        vehicle.lat <= 90 &&
-        vehicle.lng >= -180 &&
-        vehicle.lng <= 180
-    );
-  }, [vehicles]);
+  const selectedVehicle = useMemo(() => {
+    return selectedVehicleId ? allVehiclesMap.get(selectedVehicleId) : undefined;
+  }, [selectedVehicleId, allVehiclesMap]);
 
   return (
     <section className="overflow-hidden rounded-xl border border-stone-800/90 bg-stone-900/80 shadow-xl backdrop-blur-sm">
-      {/* Map heading */}
+      {/* Map Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/90 p-4">
         <div>
-          <h2 className="text-lg font-bold text-white">
-            Fleet Location Map
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <span>Fleet Location Map</span>
+            {selectedVehicle && (
+              <span className="rounded-full bg-orange-500/20 px-2.5 py-0.5 text-xs font-semibold text-orange-400 border border-orange-500/30">
+                Selected: {selectedVehicle.vehicle_id}
+              </span>
+            )}
           </h2>
 
           <p className="mt-1 text-sm italic text-stone-400">
-            {loading
-              ? "Loading vehicles..."
-              : error
-                ? error
-                : `Showing ${vehicleMarkers.length} vehicles`}
+            {vehicleList.length === 0
+              ? loading
+                ? "Loading fleet coordinates..."
+                : "No vehicles loaded"
+              : `Showing ${vehicleList.length} live vehicles on interactive map`}
           </p>
         </div>
 
-        {/* SSE connection status */}
-        <div className="flex items-center gap-2">
+        {/* Status Indicator */}
+        <div className="flex items-center gap-2.5 rounded-full border border-stone-700/60 bg-stone-950/80 px-3 py-1">
           <span
             className={`h-2.5 w-2.5 rounded-full ${
               connectionStatus === "connected"
                 ? "bg-green-500 shadow-sm shadow-green-500/50"
                 : connectionStatus === "connecting"
-                  ? "bg-orange-500 shadow-sm shadow-orange-500/50"
+                  ? "bg-orange-500 shadow-sm shadow-orange-500/50 animate-pulse"
                   : "bg-red-500 shadow-sm shadow-red-500/50"
             }`}
           />
-
-          <span className="text-sm italic text-stone-300">
+          <span className="text-xs font-medium italic text-stone-300">
             {connectionStatus === "connected"
-              ? "Live"
+              ? "Live Stream Active"
               : connectionStatus === "connecting"
                 ? "Connecting..."
-                : "Reconnecting..."}
+                : "Stream Offline"}
           </span>
         </div>
       </div>
 
-      {/* Map */}
-      <div className="h-[500px] w-full">
-        {error ? (
-          <div className="p-4 text-sm italic text-red-400">
-            Failed to load map: {error}
-          </div>
-        ) : loading ? (
-          <div className="p-4 text-sm italic text-stone-400">
-            Loading vehicle locations...
-          </div>
-        ) : (
-          <MapContainer
-            center={[13.0827, 80.2707]}
-            zoom={11}
-            scrollWheelZoom={true}
-            className="h-full w-full"
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+      {/* Interactive Map */}
+      <div className="h-[460px] w-full relative">
+        <MapContainer
+          center={[13.0827, 80.2707]}
+          zoom={11}
+          scrollWheelZoom={true}
+          className="h-full w-full"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
 
-            <MarkerClusterGroup chunkedLoading>
-              {vehicleMarkers.map((vehicle) => (
+          <MapPanController
+            selectedLat={selectedVehicle?.lat}
+            selectedLng={selectedVehicle?.lng}
+          />
+
+          <MarkerClusterGroup chunkedLoading maxClusterRadius={45}>
+            {vehicleList.map((vehicle) => {
+              const isSelected = vehicle.vehicle_id === selectedVehicleId;
+              return (
                 <Marker
                   key={vehicle.vehicle_id}
                   position={[vehicle.lat, vehicle.lng]}
-                  icon={createVehicleIcon(vehicle.status)}
+                  icon={createVehicleIcon(vehicle.status, isSelected)}
+                  eventHandlers={{
+                    click: () => selectVehicle(vehicle.vehicle_id),
+                  }}
                 >
                   <Popup>
-                    <div className="space-y-1">
-                      <strong>{vehicle.vehicle_id}</strong>
-
-                      <p>Status: {vehicle.status}</p>
-
-                      <p>
-                        Latitude: {vehicle.lat.toFixed(5)}
-                      </p>
-
-                      <p>
-                        Longitude: {vehicle.lng.toFixed(5)}
-                      </p>
+                    <div className="space-y-1.5 p-1 text-stone-900 font-sans">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <strong className="text-sm font-bold text-orange-600">
+                          {vehicle.vehicle_id}
+                        </strong>
+                        <span className="text-xs capitalize font-semibold px-1.5 py-0.5 rounded bg-stone-100">
+                          {vehicle.status}
+                        </span>
+                      </div>
+                      <div className="text-xs space-y-0.5">
+                        <p><strong>Battery:</strong> {vehicle.soc_pct.toFixed(1)}%</p>
+                        <p><strong>Speed:</strong> {vehicle.speed_kmh.toFixed(1)} km/h</p>
+                        <p><strong>Temp:</strong> {vehicle.battery_temp_c.toFixed(1)}°C</p>
+                        <p className="text-stone-500 font-mono text-[10px]">
+                          {vehicle.lat.toFixed(4)}, {vehicle.lng.toFixed(4)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => selectVehicle(vehicle.vehicle_id)}
+                        className="mt-2 w-full rounded bg-orange-600 px-2 py-1 text-xs font-semibold text-white hover:bg-orange-500"
+                      >
+                        Inspect Telemetry
+                      </button>
                     </div>
                   </Popup>
                 </Marker>
-              ))}
-            </MarkerClusterGroup>
-          </MapContainer>
-        )}
+              );
+            })}
+          </MarkerClusterGroup>
+        </MapContainer>
       </div>
 
-      {/* Status legend */}
-      <div className="flex flex-wrap gap-5 border-t border-stone-800/90 p-4">
-        {Object.entries(statusColors).map(
-          ([status, color]) => (
-            <div
-              key={status}
-              className="flex items-center gap-2"
-            >
-              <span
-                className="h-3 w-3 rounded-full"
-                style={{ backgroundColor: color }}
-              />
+      {/* Accessible Status Legend with Shapes and Symbols */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-stone-800/90 bg-stone-950/60 p-3.5 text-xs">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="font-semibold text-stone-400 italic">Legend:</span>
+          {(Object.entries(statusConfig) as [VehicleStatus, (typeof statusConfig)[VehicleStatus]][]).map(
+            ([status, conf]) => (
+              <div key={status} className="flex items-center gap-1.5">
+                <span
+                  style={{ backgroundColor: conf.color }}
+                  className={`inline-flex h-4 w-4 items-center justify-center text-[9px] font-bold text-white shadow-sm ${conf.shapeClass}`}
+                >
+                  <span style={{ transform: status === "fault" ? "rotate(-45deg)" : "none" }}>
+                    {conf.symbol}
+                  </span>
+                </span>
+                <span className="capitalize font-medium text-stone-300">
+                  {conf.label}
+                </span>
+              </div>
+            )
+          )}
+        </div>
 
-              <span className="text-sm capitalize italic text-stone-300">
-                {status}
-              </span>
-            </div>
-          )
-        )}
+        <div className="text-stone-500 italic text-[11px]">
+          Click marker to sync with list & telemetry
+        </div>
       </div>
     </section>
   );
 }
-
-export default FleetMap;
