@@ -2,8 +2,7 @@ import { create } from "zustand";
 
 import type {
   Vehicle,
-  VehicleFilters,
-  VehicleStatus
+  VehicleFilters
 } from "../types/vehicle";
 
 import type { FleetSummary } from "../types/fleet";
