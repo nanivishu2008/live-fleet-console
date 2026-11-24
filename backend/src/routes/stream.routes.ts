@@ -6,36 +6,41 @@ import {
   getEventsAfter,
   type StreamEvent,
 } from "../stream/event-broker.js";
+import { activeFaults } from "../simulator/fault.config.js";
 
 const router = Router();
 
-interface FaultConfig {
+interface EffectiveFaultConfig {
   latencyMs: number;
   duplicateRate: number;
   outOfOrder: boolean;
   disconnectAfter: number;
 }
 
-function getFaultConfig(query: Record<string, unknown>): FaultConfig {
-  const latencyMs = Number(query.latencyMs ?? 0);
-  const duplicateRate = Number(query.duplicateRate ?? 0);
-  const disconnectAfter = Number(query.disconnectAfter ?? 0);
+function getEffectiveFaultConfig(query: Record<string, unknown>): EffectiveFaultConfig {
+  const queryLatency = Number(query.latencyMs ?? 0);
+  const queryDuplicate = Number(query.duplicateRate ?? 0);
+  const queryDisconnect = Number(query.disconnectAfter ?? 0);
+
+  const latencyMs = Number.isFinite(queryLatency) && queryLatency > 0
+    ? Math.min(3000, queryLatency)
+    : activeFaults.latencyMs;
+
+  const duplicateRate = Number.isFinite(queryDuplicate) && queryDuplicate > 0
+    ? Math.min(1, queryDuplicate)
+    : activeFaults.duplicateRate;
+
+  const outOfOrder = query.outOfOrder === "true" || activeFaults.outOfOrder;
+
+  const disconnectAfter = Number.isInteger(queryDisconnect) && queryDisconnect > 0
+    ? queryDisconnect
+    : activeFaults.disconnectAfter;
 
   return {
-    latencyMs: Number.isFinite(latencyMs)
-      ? Math.min(3000, Math.max(0, latencyMs))
-      : 0,
-
-    duplicateRate: Number.isFinite(duplicateRate)
-      ? Math.min(1, Math.max(0, duplicateRate))
-      : 0,
-
-    outOfOrder: query.outOfOrder === "true",
-
-    disconnectAfter:
-      Number.isInteger(disconnectAfter) && disconnectAfter > 0
-        ? disconnectAfter
-        : 0,
+    latencyMs,
+    duplicateRate,
+    outOfOrder,
+    disconnectAfter,
   };
 }
 
@@ -46,7 +51,7 @@ function sendEvent(res: Response, event: StreamEvent): void {
 }
 
 router.get("/", (req, res) => {
-  const config = getFaultConfig(
+  const config = getEffectiveFaultConfig(
     req.query as Record<string, unknown>
   );
 
@@ -67,15 +72,20 @@ router.get("/", (req, res) => {
   function scheduleEvent(event: StreamEvent): void {
     if (disconnected) return;
 
-    // Simulate events arriving out of order.
-    let delay = config.latencyMs > 0
-      ? Math.random() * config.latencyMs
+    // Check dynamic faults as well
+    const effectiveLatency = activeFaults.latencyMs > 0 ? activeFaults.latencyMs : config.latencyMs;
+    const effectiveOutOfOrder = activeFaults.outOfOrder || config.outOfOrder;
+    const effectiveDuplicateRate = activeFaults.duplicateRate > 0 ? activeFaults.duplicateRate : config.duplicateRate;
+    const effectiveDisconnectAfter = activeFaults.disconnectAfter > 0 ? activeFaults.disconnectAfter : config.disconnectAfter;
+
+    let delay = effectiveLatency > 0
+      ? Math.random() * effectiveLatency
       : 0;
 
-    if (config.outOfOrder) {
+    if (effectiveOutOfOrder) {
       delay = event.id % 2 === 0
         ? 0
-        : config.latencyMs;
+        : (effectiveLatency > 0 ? effectiveLatency : 400);
     }
 
     const timer = setTimeout(() => {
@@ -86,15 +96,15 @@ router.get("/", (req, res) => {
       sendEvent(res, event);
       deliveredCount++;
 
-      // Occasionally send the same event again.
-      if (Math.random() < config.duplicateRate) {
+      // Duplicate delivery fault
+      if (Math.random() < effectiveDuplicateRate) {
         sendEvent(res, event);
       }
 
-      // Simulate a sudden connection failure.
+      // Disconnect fault
       if (
-        config.disconnectAfter > 0 &&
-        deliveredCount >= config.disconnectAfter
+        (effectiveDisconnectAfter > 0 && deliveredCount >= effectiveDisconnectAfter) ||
+        (activeFaults.disconnect && deliveredCount > 50)
       ) {
         disconnected = true;
         unsubscribe();
@@ -117,7 +127,7 @@ router.get("/", (req, res) => {
     scheduleEvent(event);
   });
 
-  const lastEventId = Number(req.headers["last-event-id"] ?? 0);
+  const lastEventId = Number(req.headers["last-event-id"] ?? req.query.lastEventId ?? 0);
 
   if (Number.isInteger(lastEventId) && lastEventId >= 0) {
     const missedEvents = getEventsAfter(lastEventId);

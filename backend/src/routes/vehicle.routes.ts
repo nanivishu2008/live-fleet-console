@@ -2,6 +2,7 @@ import { Router } from "express";
 import { vehicles } from "../data/vehicles.js";
 
 const router = Router();
+
 // Get locations of all vehicles for the fleet map
 router.get("/locations", (_req, res) => {
   const locations = vehicles.map((vehicle) => ({
@@ -17,6 +18,7 @@ router.get("/locations", (_req, res) => {
     items: locations,
   });
 });
+
 const validStatuses = new Set([
   "moving",
   "idle",
@@ -24,6 +26,14 @@ const validStatuses = new Set([
   "offline",
   "fault",
 ]);
+
+export interface HistoryPoint {
+  ts: string;
+  soc_pct: number;
+  battery_temp_c: number;
+  speed_kmh: number;
+}
+
 router.get("/:id/history", (req, res) => {
   const vehicleId = req.params.id;
 
@@ -74,55 +84,54 @@ router.get("/:id/history", (req, res) => {
   const interval =
     (to.getTime() - from.getTime()) / (points - 1);
 
-  // Generate mock historical readings
-  const history = Array.from(
-    { length: points },
-    (_, index) => {
-      const timestamp = new Date(
-        from.getTime() + interval * index
-      );
+  // Define a real time gap window (e.g. 10% of points omitted to simulate real data gap)
+  const gapStart = Math.floor(points * 0.4);
+  const gapEnd = Math.floor(points * 0.52);
 
-      const progress = index / (points - 1);
+  // Generate mock historical readings with real time gaps
+  const history: HistoryPoint[] = [];
 
-      const socVariation = Math.random() * 10;
-
-      return {
-        timestamp: timestamp.toISOString(),
-
-        soc_pct: Number(
-          Math.min(
-            100,
-            Math.max(
-              0,
-              vehicle.soc_pct - (1 - progress) * socVariation
-            )
-          ).toFixed(1)
-        ),
-
-        battery_temp_c: Number(
-          (
-            vehicle.battery_temp_c +
-            (Math.random() * 4 - 2)
-          ).toFixed(1)
-        ),
-
-        speed_kmh:
-          vehicle.status === "moving"
-            ? Number((Math.random() * 40 + 10).toFixed(1))
-            : 0,
-
-        // Simulate occasional missing telemetry
-        gap: Math.random() < 0.05,
-      };
+  for (let index = 0; index < points; index++) {
+    // Introduce real gap by omitting readings during this range
+    if (index >= gapStart && index <= gapEnd) {
+      continue;
     }
-  );
 
-  return res.status(200).json({
-    success: true,
-    vehicle_id: vehicle.vehicle_id,
-    history,
-  });
+    const timestamp = new Date(
+      from.getTime() + interval * index
+    );
+
+    const progress = index / (points - 1);
+    const socVariation = Math.random() * 8;
+
+    history.push({
+      ts: timestamp.toISOString(),
+      soc_pct: Number(
+        Math.min(
+          100,
+          Math.max(
+            0,
+            vehicle.soc_pct - (1 - progress) * socVariation
+          )
+        ).toFixed(1)
+      ),
+      battery_temp_c: Number(
+        (
+          vehicle.battery_temp_c +
+          (Math.random() * 4 - 2)
+        ).toFixed(1)
+      ),
+      speed_kmh:
+        vehicle.status === "moving"
+          ? Number((Math.random() * 40 + 10).toFixed(1))
+          : 0,
+    });
+  }
+
+  // Return a plain array of { ts, soc_pct, battery_temp_c, speed_kmh } per contract
+  return res.status(200).json(history);
 });
+
 router.get("/", (req, res) => {
   // Read query parameters
   const q =
@@ -144,6 +153,11 @@ router.get("/", (req, res) => {
     typeof req.query.soc_max === "string"
       ? Number(req.query.soc_max)
       : undefined;
+
+  const bbox =
+    typeof req.query.bbox === "string"
+      ? req.query.bbox.trim()
+      : "";
 
   const limit =
     typeof req.query.limit === "string"
@@ -175,11 +189,29 @@ router.get("/", (req, res) => {
     });
   }
 
+  // Validate bbox (west,south,east,north)
+  let bboxCoords: [number, number, number, number] | null = null;
+  if (bbox) {
+    const parts = bbox.split(",").map(Number);
+    if (
+      parts.length !== 4 ||
+      !parts.every(Number.isFinite) ||
+      parts[0] > parts[2] || // west > east
+      parts[1] > parts[3]    // south > north
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid bbox format. Expected: west,south,east,north",
+      });
+    }
+    bboxCoords = parts as [number, number, number, number];
+  }
+
   // Validate pagination
   if (
     !Number.isInteger(limit) ||
     limit < 1 ||
-    limit > 100 ||
+    limit > 2000 ||
     !Number.isInteger(cursor) ||
     cursor < 0
   ) {
@@ -189,7 +221,7 @@ router.get("/", (req, res) => {
     });
   }
 
-  // Apply search and filters
+  // Apply search, filters, and bbox
   const filteredVehicles = vehicles.filter((vehicle) => {
     const matchesSearch =
       !q || vehicle.vehicle_id.toLowerCase().includes(q);
@@ -203,11 +235,22 @@ router.get("/", (req, res) => {
     const matchesSocMax =
       socMax === undefined || vehicle.soc_pct <= socMax;
 
+    let matchesBbox = true;
+    if (bboxCoords) {
+      const [west, south, east, north] = bboxCoords;
+      matchesBbox =
+        vehicle.lng >= west &&
+        vehicle.lng <= east &&
+        vehicle.lat >= south &&
+        vehicle.lat <= north;
+    }
+
     return (
       matchesSearch &&
       matchesStatus &&
       matchesSocMin &&
-      matchesSocMax
+      matchesSocMax &&
+      matchesBbox
     );
   });
 

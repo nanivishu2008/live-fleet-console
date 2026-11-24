@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { alerts } from "../data/alerts.js";
+import { emitAlertChanged } from "../stream/event-broker.js";
 
 const router = Router();
 
@@ -110,6 +111,8 @@ router.post("/:id/ack", (req, res) => {
   // Acknowledge alert
   alert.state = "acknowledged";
   alert.version++;
+
+  emitAlertChanged(alert);
 
   return res.status(200).json({
     success: true,
